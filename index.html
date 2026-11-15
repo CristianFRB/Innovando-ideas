@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FireCal · Calendario mundial de actividad de fuego</title>
+  <meta name="description" content="Calendario armonizado de actividad de fuego a partir de focos de calor satelitales (NASA FIRMS: MODIS + VIIRS)." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/estilos.css" />
+</head>
+<body>
+  <header class="cabecera">
+    <div class="marca">
+      <span class="logo" aria-hidden="true">🔥</span>
+      <div>
+        <h1>FireCal</h1>
+        <p class="lema">Calendario de actividad de fuego · enfoque <b>Huánuco y Amazonía peruana</b> · NASA FIRMS (MODIS + VIIRS) armonizado</p>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="#explorar">Explorar</a>
+      <a href="#" data-ir="metodo">Método</a>
+      <a href="#equipo">Equipo</a>
+    </nav>
+  </header>
+
+  <div id="aviso-ejemplo" class="aviso" hidden>
+    ℹ️ <strong><span id="aviso-area"></span> aún no tiene historial guardado.</strong>
+    Puedes descargarlo <strong>en vivo desde la NASA</strong> en el panel <em>3 · Consultar NASA FIRMS → Historial del área</em> (se guarda en este navegador),
+    o ver los focos recientes y de cualquier rango de fechas.
+    Países con historial guardado en el proyecto: <span id="aviso-reales"></span>.
+    <details class="aviso-detalle">
+      <summary>Agregar este historial al proyecto (para el equipo)</summary>
+      Ejecuta en la carpeta del proyecto: <code id="aviso-comando"></code>
+      <button class="btn-mini" id="btn-copiar" type="button">Copiar</button>
+    </details>
+  </div>
+
+  <section class="guia" id="guia">
+    <div class="guia-paso"><span>1</span><div><b>Elige Huánuco o la Amazonía</b><br>con los botones del panel 1</div></div>
+    <div class="guia-paso"><span>2</span><div><b>¿Cuándo se quema más?</b><br>mira el calendario y el cuadro mensual</div></div>
+    <div class="guia-paso"><span>3</span><div><b>¿Dónde fueron los incendios?</b><br>elige año, mes o día en el panel 3</div></div>
+    <div class="guia-paso"><span>4</span><div><b>¿Cómo lo hicimos?</b><br>pestaña 🛰️ Satélites</div></div>
+    <button type="button" class="btn-mini" id="btn-cerrar-guia" aria-label="Ocultar guía">✕</button>
+  </section>
+
+  <main id="explorar">
+    <!-- PANEL IZQUIERDO -->
+    <aside class="panel" id="panel">
+      <button type="button" class="btn-panel ocultar-panel" id="btn-panel" aria-expanded="true" title="Ocultar el panel y agrandar el mapa">☰ Ocultar panel</button>
+      <section class="tarjeta">
+        <h2>1 · Elige un área</h2>
+        <label class="etiqueta" for="sel-region">Regiones de enfoque</label>
+        <select id="sel-region"></select>
+        <label class="etiqueta" for="buscador">Otro país</label>
+        <input id="buscador" list="lista-paises" placeholder="Ej.: Perú, Brasil, Australia…" autocomplete="off" />
+        <datalist id="lista-paises"></datalist>
+        <p class="ayuda">…o haz clic en un país del mapa.</p>
+        <button id="btn-dibujar" class="btn" type="button">✏️ Dibujar un área (rectángulo)</button>
+        <p id="ayuda-dibujo" class="ayuda" hidden>👉 Mantén presionado y <b>arrastra</b> sobre el mapa (o haz clic en dos esquinas). Esc para cancelar.</p>
+      </section>
+
+      <section class="tarjeta">
+        <h2>2 · Opciones</h2>
+        <label class="etiqueta" for="sel-anio">Año a destacar</label>
+        <select id="sel-anio"></select>
+        <label class="etiqueta" for="sel-metrica">Color del calendario</label>
+        <select id="sel-metrica">
+          <option value="actividad">Actividad (cuánto fuego hubo)</option>
+          <option value="anomalia">Anomalía (más o menos de lo normal)</option>
+        </select>
+        <label class="etiqueta" for="sel-base">Periodo de referencia (normal)</label>
+        <select id="sel-base"></select>
+      </section>
+
+      <section class="tarjeta" id="tarjeta-vivo">
+        <h2>3 · Consultar NASA FIRMS (en vivo)</h2>
+        <label class="etiqueta" for="map-key">Tu MAP_KEY de FIRMS</label>
+        <input id="map-key" type="password" placeholder="32 caracteres" autocomplete="off" spellcheck="false" />
+        <p class="ayuda">Se guarda solo en este navegador (no se sube a GitHub). <a href="https://firms.modaps.eosdis.nasa.gov/api/map_key/" target="_blank" rel="noopener">Pide una gratis</a>.</p>
+
+        <div class="bloque-consulta">
+          <span class="etiqueta">🔥 Incendios en el mapa: elige la fecha</span>
+          <div class="fila-fecha3">
+            <select id="f-anio" aria-label="Año"></select>
+            <select id="f-mes" aria-label="Mes">
+              <option value="">Todo el año</option>
+              <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+              <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+              <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+              <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+            <select id="f-dia" aria-label="Día"></select>
+          </div>
+          <button id="btn-ultimo-mes" class="btn-mini" type="button">⏱ Último mes</button>
+          <p class="ayuda" id="estimacion"></p>
+          <button id="btn-buscar" class="btn" type="button">🔥 Ver incendios</button>
+          <button id="btn-cancelar" class="btn-mini" type="button" hidden>✋ Cancelar</button>
+          <div class="barra" id="barra" hidden><div id="barra-relleno"></div></div>
+        </div>
+
+        <div class="bloque-consulta">
+          <span class="etiqueta">C · Historial del área (calendario)</span>
+          <select id="sel-hist" aria-label="Años de historial">
+            <option value="3">Últimos 3 años (~3 min)</option>
+            <option value="5">Últimos 5 años (~5 min)</option>
+            <option value="2012">Desde 2012, todo VIIRS (~15-25 min)</option>
+          </select>
+          <button id="btn-hist" class="btn" type="button">⬇️ Descargar historial en vivo</button>
+          <p class="ayuda">Se guarda en este navegador: la próxima vez carga al instante.</p>
+        </div>
+        <p id="vivo-estado" class="ayuda" aria-live="polite"></p>
+      </section>
+
+      <section class="tarjeta kpis" aria-live="polite">
+        <h2 id="kpi-titulo">Resumen</h2>
+        <div class="kpi">
+          <span class="kpi-etq">Temporada crítica</span>
+          <span class="kpi-val" id="kpi-temporada">—</span>
+          <span class="kpi-sub" id="kpi-pico"></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-etq">Últimos 30 días</span>
+          <span class="kpi-val" id="kpi-reciente">—</span>
+          <span class="kpi-sub" id="kpi-reciente-sub"></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-etq">Año seleccionado</span>
+          <span class="kpi-val" id="kpi-anio">—</span>
+          <span class="kpi-sub" id="kpi-anio-sub"></span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-etq">Tendencia anual</span>
+          <span class="kpi-val" id="kpi-tendencia">—</span>
+          <span class="kpi-sub" id="kpi-tendencia-sub"></span>
+        </div>
+      </section>
+    </aside>
+
+    <!-- CONTENIDO -->
+    <div class="contenido">
+      <button type="button" class="btn-panel mostrar-panel" id="btn-mostrar-panel" title="Mostrar el panel de opciones">☰ Mostrar panel</button>
+      <section class="tarjeta mapa-tarjeta">
+        <div class="tarjeta-cab">
+          <h2>Mapa · <span id="mapa-titulo">imágenes de la NASA (GIBS)</span></h2>
+          <span class="ayuda" id="mapa-fecha"></span>
+        </div>
+        <div id="mapa" role="region" aria-label="Mapa mundial"></div>
+        <div id="panel-incendio" hidden></div>
+      </section>
+
+      <nav class="pestanas" role="tablist" aria-label="Información">
+        <button type="button" role="tab" data-ir="incendios">🔥 Incendios</button>
+        <button type="button" role="tab" data-ir="riesgo">⚠️ Riesgo</button>
+        <button type="button" role="tab" data-ir="calendario">📅 Calendario</button>
+        <button type="button" role="tab" data-ir="mensual">📊 Mensual</button>
+        <button type="button" role="tab" data-ir="diario">🗓️ Día a día</button>
+        <button type="button" role="tab" data-ir="tendencia">📈 Tendencia y clima</button>
+        <button type="button" role="tab" data-ir="metodo">🛰️ Satélites</button>
+      </nav>
+      <section class="tarjeta" id="tarjeta-riesgo" data-pestana="riesgo">
+        <div class="tarjeta-cab">
+          <h2>⚠️ ¿Dónde es más probable que empiece un incendio? · <span id="rg-area"></span></h2>
+          <span class="ayuda">Amazonía (Perú, Bolivia, Colombia, Ecuador o un área dibujada) · próximas 2 semanas</span>
+        </div>
+        <div class="rg-controles">
+          <label class="etiqueta" for="rg-fecha" style="margin:0">Desde el día</label>
+          <input id="rg-fecha" type="date" min="2013-01-01" />
+          <button id="btn-rg-hoy" class="btn-mini" type="button">Hoy</button>
+          <button id="btn-riesgo" class="btn" type="button">⚠️ Calcular riesgo</button>
+        </div>
+        <p class="ayuda" id="rg-ayuda">Elige <b>hoy</b> para saber dónde vigilar, o una <b>fecha pasada</b> para comprobar si la predicción acierta.</p>
+        <div class="barra" id="rg-barra" hidden><div id="rg-relleno"></div></div>
+        <p id="rg-estado" class="ayuda" aria-live="polite"></p>
+        <div id="rg-resumen"></div>
+        <div class="tabla-scroll"><table id="rg-tabla" class="tabla-clic"></table></div>
+        <details class="tabla-detalle">
+          <summary>¿Cómo calculamos el riesgo?</summary>
+          <ol>
+            <li><b>Historia (lo más importante):</b> dividimos el área en cuadros de ~11 km y contamos en cuántos años, desde 2012, hubo incendios en ese cuadro durante <i>las mismas 2 semanas</i> del año (satélites VIIRS de la NASA). En la Amazonía las quemas se repiten casi en los mismos lugares y fechas cada año.</li>
+            <li><b>Incendios recientes:</b> si en los 7 días anteriores hubo focos activos en el cuadro o al lado, el riesgo sube.</li>
+            <li><b>Sequedad:</b> comparamos la lluvia del último mes con lo normal (NASA POWER). Menos lluvia = vegetación más seca = más riesgo.</li>
+            <li><b>Niveles:</b> ordenamos todos los cuadros del área. El <b>5 %</b> con más riesgo es <b>muy alto</b>, el siguiente <b>10 %</b> es <b>alto</b> y el siguiente <b>15 %</b> es <b>medio</b>. Así el mapa señala pocos lugares donde vigilar, en vez de pintar todo de rojo. El % de cada cuadro es la probabilidad aproximada de que haya fuego allí en esas 2 semanas.</li>
+            <li><b>Comprobación:</b> con una fecha pasada, la predicción usa solo los años anteriores y luego la comparamos con los incendios que de verdad ocurrieron.</li>
+          </ol>
+          <p class="ayuda">Es una probabilidad basada en patrones, no una predicción exacta: muchos incendios en la Amazonía los provocan quemas agrícolas. Sistemas como GFWED (NASA) o GWIS (Copernicus) además usan pronósticos del tiempo.</p>
+        </details>
+      </section>
+
+      <section class="tarjeta" id="sin-incendios" data-pestana="incendios">
+        <p class="ayuda" style="margin:0">Aún no hay incendios consultados. Elige una fecha en el panel <b>3</b> (o espera la carga del último mes).</p>
+      </section>
+
+      <section class="tarjeta" id="tarjeta-incendios" data-pestana="incendios" hidden>
+        <div class="tarjeta-cab">
+          <h2>Incendios detectados · <span id="inc-titulo"></span></h2>
+          <span class="ayuda">Focos a menos de ~1 km y con hasta 1 día de diferencia = un mismo incendio. La superficie es el área de los píxeles con calor (aprox.), no el área quemada exacta.</span>
+        </div>
+        <p id="inc-resumen" class="ayuda"></p>
+        <div class="acciones-inc">
+          <button id="btn-animar" class="btn-mini" type="button">▶ Ver cómo avanzaron día a día</button>
+          <button id="btn-csv-incendios" class="btn-mini" type="button">⬇️ Descargar lista (CSV)</button>
+        </div>
+        <div class="tabla-scroll"><table id="tabla-incendios" class="tabla-clic"></table></div>
+      </section>
+
+      <section class="tarjeta vacio" id="vacio" data-pestana="calendario mensual diario tendencia" hidden>
+        <h2>Sin historial guardado para <span id="vacio-area"></span></h2>
+        <p>No mostramos datos inventados: el calendario, la temporada crítica y la tendencia aparecen cuando hay datos reales de la NASA.</p>
+        <ol>
+          <li>Pega tu MAP_KEY en el panel <b>3</b>.</li>
+          <li>Pulsa <b>"Descargar historial en vivo"</b> (opción C): se consulta la API de FIRMS y se guarda en tu navegador.</li>
+          <li>Mientras tanto puedes ver los <b>focos recientes</b> (A) o los de un <b>rango de fechas</b> (B) en el mapa.</li>
+        </ol>
+      </section>
+
+      <div id="bloque-graficos">
+      <section class="tarjeta" data-pestana="calendario">
+        <div class="tarjeta-cab">
+          <h2>Calendario de actividad de fuego · <span id="cal-area"></span></h2>
+          <span class="ayuda" id="cal-leyenda-txt">Días-celda con fuego por mes (equivalente VIIRS 375 m)</span>
+        </div>
+        <p class="ayuda" id="origen-datos"></p>
+        <p class="leyenda-eras"><span class="era modis">● 2001–2011 · satélites antiguos MODIS</span> Terra y Aqua, píxel de 1 km, <b>ajustados</b> a VIIRS ·
+          <span class="era viirs">● 2012–hoy · satélites modernos VIIRS</span> Suomi NPP, NOAA-20 y NOAA-21, píxel de 375 m · <a href="#" data-ir="metodo">¿cómo los unimos?</a></p>
+        <div id="graf-calendario" class="grafico alto"></div>
+        <details class="tabla-detalle">
+          <summary>Ver como tabla / descargar CSV</summary>
+          <button id="btn-csv" class="btn-mini" type="button">⬇️ Descargar CSV mensual</button>
+          <div id="tabla-mensual" class="tabla-scroll"></div>
+        </details>
+      </section>
+
+      <section class="tarjeta" data-pestana="mensual">
+        <div class="tarjeta-cab">
+          <h2>Cuadro estadístico mensual · <span id="est-titulo"></span></h2>
+          <span class="ayuda">Días-celda con fuego por mes · periodo normal <span id="est-base"></span></span>
+        </div>
+        <div class="tabla-scroll alta"><table id="tabla-estadistica" class="tabla-est"></table></div>
+        <p class="ayuda">🔥 = mes dentro de la temporada crítica. <b>z</b> = cuántas desviaciones estándar se aleja el mes de lo normal (|z| ≥ 2 es inusual).
+          <b>Tendencia</b> = pendiente de Sen del mismo mes a lo largo de los años, con prueba de Mann-Kendall (significativa si p &lt; 0,05).</p>
+      </section>
+
+      <div class="fila-2" data-pestana="diario">
+        <section class="tarjeta">
+          <div class="tarjeta-cab">
+            <h2>Día a día · <span id="dia-anio"></span></h2>
+            <span class="ayuda">Haz clic en un día para ver la imagen satelital</span>
+          </div>
+          <div id="graf-diario" class="grafico"></div>
+        </section>
+        <section class="tarjeta">
+          <div class="tarjeta-cab">
+            <h2>Ciclo anual: <span id="ciclo-anio"></span> vs lo normal</h2>
+          </div>
+          <div id="graf-ciclo" class="grafico"></div>
+        </section>
+      </div>
+
+      <div class="fila-2" data-pestana="tendencia">
+        <section class="tarjeta">
+          <div class="tarjeta-cab">
+            <h2>Total anual y tendencia</h2>
+            <span class="ayuda">Mann-Kendall + pendiente de Sen</span>
+          </div>
+          <div id="graf-anual" class="grafico"></div>
+        </section>
+        <section class="tarjeta">
+          <div class="tarjeta-cab">
+            <h2>Clima del año · NASA POWER</h2>
+            <span class="ayuda" id="clima-estado">Punto central del área</span>
+          </div>
+          <div class="multiples">
+            <div id="graf-fuego-mes" class="grafico mini"></div>
+            <div id="graf-lluvia" class="grafico mini"></div>
+            <div id="graf-humedad" class="grafico mini"></div>
+          </div>
+        </section>
+      </div>
+      </div>
+  <section id="metodo" class="tarjeta" data-pestana="metodo">
+        <div class="tarjeta-cab">
+          <h2>🛰️ ¿Cómo unimos los satélites viejos con los nuevos?</h2>
+          <span class="ayuda">Ejemplo con datos reales de <b id="exp-area">Huánuco</b></span>
+        </div>
+        <div class="linea-tiempo" aria-label="Satélites usados">
+          <div class="hito modis"><b>1999</b>Terra<br><span>MODIS · píxel 1 km</span></div>
+          <div class="hito modis"><b>2002</b>Aqua<br><span>MODIS · píxel 1 km</span></div>
+          <div class="hito viirs"><b>2011</b>Suomi NPP<br><span>VIIRS · píxel 375 m</span></div>
+          <div class="hito viirs"><b>2017</b>NOAA-20<br><span>VIIRS · píxel 375 m</span></div>
+          <div class="hito viirs"><b>2022</b>NOAA-21<br><span>VIIRS · píxel 375 m</span></div>
+        </div>
+        <div class="pasos" role="tablist">
+          <button type="button" data-paso="0" class="activo">1 · Dos satélites</button>
+          <button type="button" data-paso="1">2 · El problema</button>
+          <button type="button" data-paso="2">3 · La solución</button>
+          <button type="button" data-paso="3">4 · Resultado</button>
+          <button type="button" id="btn-reproducir" class="reproducir">▶ Ver explicación</button>
+        </div>
+        <div class="exp-grid">
+          <div id="graf-explica" class="grafico"></div>
+          <div id="exp-texto" class="exp-texto" aria-live="polite"></div>
+        </div>
+        <details class="tabla-detalle">
+          <summary>Detalles técnicos del método</summary>
+          <ol>
+            <li><strong>Fuentes:</strong> focos de calor de NASA FIRMS. MODIS (Terra/Aqua, 1 km) desde noviembre de 2000 y VIIRS S-NPP (375 m) desde el 20 de enero de 2012.</li>
+            <li><strong>Filtro:</strong> solo detecciones de confianza nominal o alta y de tipo "vegetación" (se quitan volcanes y fuentes industriales fijas).</li>
+            <li><strong>Días-celda:</strong> dividimos el área en celdas de ~1 km (0,01°) y contamos cuántas celdas tuvieron al menos un foco cada día.</li>
+            <li><strong>Intercalibración:</strong> en los años en que funcionan ambos satélites calculamos, para cada mes, el factor VIIRS/MODIS. Antes de 2012 multiplicamos MODIS por ese factor: la serie queda en "equivalente VIIRS".</li>
+            <li><strong>Normal e inusual:</strong> cada mes se compara con su promedio (puntaje z). La temporada crítica concentra del 10 % al 90 % del fuego de un año promedio.</li>
+            <li><strong>Tendencia:</strong> prueba de Mann-Kendall y pendiente de Sen.</li>
+            <li><strong>Incendios:</strong> focos a menos de ~1 km y con hasta 1 día de diferencia forman un mismo incendio; la zona afectada es el área de los píxeles con calor (aproximada, no es el área quemada exacta).</li>
+          </ol>
+          <p class="ayuda">Fuentes: NASA FIRMS (focos), NASA GIBS (imágenes), NASA POWER (clima), geoBoundaries y Natural Earth (límites).</p>
+        </details>
+      </section>
+    </div>
+  </main>
+
+  <section id="equipo" class="tarjeta texto">
+    <h2>Sobre el equipo</h2>
+    <p>Nos fascina investigar y crear. Nuestro equipo busca <em>soñar como un niño y pensar como un adulto</em>.</p>
+    <p class="ayuda">Proyecto para el NASA Space Apps Challenge 2026 · Equipo Espace Apps Ideas Innovadoras.</p>
+  </section>
+
+  <footer class="pie">
+    FireCal · NASA Space Apps Challenge 2026 · Datos: NASA FIRMS, GIBS y POWER. La NASA no respalda este proyecto.
+  </footer>
+
+  <!-- Librerías -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <!-- Datos reales (los crea scripts/descargar_datos.py; si no existe, se usan datos de ejemplo) -->
+  <!-- Configuración local opcional (no se sube a GitHub): window.FIRECAL_CONFIG = { mapKey: "..." } -->
+  <script src="js/config.js"></script>
+  <script src="data/focos.js"></script>
+  <script src="data/densidad.js"></script>
+  <script src="data/regiones.js"></script>
+  <script src="data/sensores.js"></script>
+  <!-- App -->
+  <script src="js/estadistica.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

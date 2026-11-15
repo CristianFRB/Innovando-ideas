@@ -1,0 +1,23 @@
+# Claves (¡nunca subir!)
+.env
+
+# Caché de descargas de la API de FIRMS
+cache/
+descargas/
+
+# Python
+__pycache__/
+*.pyc
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Archivos viejos para borrar a mano
+_to_delete/
+
+# Clave local para la página
+js/config.js
+
+# Manual con la clave (privado)
+*PRIVADO*
